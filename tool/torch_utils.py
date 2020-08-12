@@ -14,9 +14,9 @@ import imghdr  # get_image_size
 
 from tool import utils
 
-
 logging.basicConfig(level=os.getenv("LOG_LEVEL", logging.DEBUG))
 LOGGER = logging.getLogger(__name__)
+
 
 def bbox_ious(boxes1, boxes2, x1y1x2y2=True):
     if x1y1x2y2:
@@ -106,41 +106,40 @@ def do_detect(model, img, conf_thresh, nms_thresh, use_cuda=1):
     return utils.post_processing(img, conf_thresh, nms_thresh, output)
 
 
-def preprocess(unprocessed_batch_input):
-    LOGGER.debug("Processing Image Batch of shape : {}".format(unprocessed_batch_input.shape))
-    processed_batch = [cv2.resize(cv2.cvtColor(x, cv2.COLOR_BGR2RGB), (416, 416), interpolation=cv2.INTER_LINEAR) / 255
-                       for x in
-                       unprocessed_batch_input]
-    processed_batch_transpose = [np.transpose(x, (2, 0, 1)).astype(np.float32) for x in processed_batch]
-    processed_batch = torch.from_numpy(processed_batch_transpose)
-    return processed_batch
+class Transform:
+
+    @staticmethod
+    def preprocess(unprocessed_batch_input):
+        unprocessed_batch_input = np.array(unprocessed_batch_input)
+        LOGGER.debug("Processing Image Batch of shape : {}".format(unprocessed_batch_input.shape))
+        processed_batch = [
+            cv2.resize(cv2.cvtColor(x, cv2.COLOR_BGR2RGB), (416, 416), interpolation=cv2.INTER_LINEAR) / 255
+            for x in
+            unprocessed_batch_input]
+        processed_batch_transpose = np.array([np.transpose(x, (2, 0, 1)).astype(np.float32) for x in processed_batch])
+        processed_batch = torch.from_numpy(processed_batch_transpose)
+        return processed_batch
 
 
-def do_detect_batch(model, batch_input, conf_thresh, nms_thresh, use_cuda=1):
-    model.eval()
-    t0 = time.time()
-    transformed_batch_input = preprocess(batch_input)
-    if type(img) == np.ndarray and len(img.shape) == 3:  # cv2 image
-        img = torch.from_numpy(img.transpose(2, 0, 1)).float().div(255.0).unsqueeze(0)
-    elif type(img) == np.ndarray and len(img.shape) == 4:
-        img = torch.from_numpy(img.transpose(0, 3, 1, 2)).float().div(255.0)
-    else:
-        print("unknow image type")
-        exit(-1)
+class Yolov4Classifier:
+    def __init__(self, conf_thresh, nms_thresh, device, height, width):
+        self.conf_thresh = conf_thresh
+        self.nms_thresh = nms_thresh
+        self.device = device
+        self.height = height
+        self.width = width
 
-    if use_cuda:
-        img = img.cuda()
-    img = torch.autograd.Variable(img)
-
-    t1 = time.time()
-
-    output = model(img)
-
-    t2 = time.time()
-
-    print('-----------------------------------')
-    print('           Preprocess : %f' % (t1 - t0))
-    print('      Model Inference : %f' % (t2 - t1))
-    print('-----------------------------------')
-
-    return utils.post_processing(img, conf_thresh, nms_thresh, output)
+    def predict_batch(self, model, batch_input, conf_thresh, nms_thresh, use_cuda=1):
+        model.eval()
+        t0 = time.time()
+        transformed_batch_input = Transform.preprocess(batch_input)
+        transformed_batch_input = transformed_batch_input.to(self.device)
+        t1 = time.time()
+        output = model(transformed_batch_input)
+        t2 = time.time()
+        print('-----------------------------------')
+        print('           Preprocess : %f' % (t1 - t0))
+        print('      Model Inference : %f' % (t2 - t1))
+        print('-----------------------------------')
+        boxes_out = utils.post_processing(None, self.conf_thresh, self.nms_thresh, output)
+        return boxes_out

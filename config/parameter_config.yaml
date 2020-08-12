@@ -9,18 +9,18 @@ class_map: # dictionary of classes we only care about (CART classes)
   "7": truck
 model_config:
   num_classes: 80
-  class_threshold: .30
-  object_detection_threshold: .80 # minimum confidence of the object detections
+  confidence_threshold: .30
   nms_threshold: .50 # threshold for selecting a bounding box when multiple bounding boxes competing for same object
   device: cpu # set to cuda:0 to process on GPU. set to "cpu" if working on non-GPU machine
   image_height: 416
   image_width: 416
   backbone_name: darknet53
   backbone_pretrained: $LOCAL_PATH/model_weights/darknet53_weights_pytorch.pth
-  classifier_path: $LOCAL_PATH/model_weights/official_yolov3_weights_pytorch.pth
+  classifier_path: '/Users/ravikannan/Desktop/workspace/cv/tian/pytorch-YOLOv4/weights/yolov4.pth'
   transform_device: cpu
   anchors: [[[116, 90], [156, 198], [373, 326]], [[30, 61], [62, 45], [59, 119]], [[10, 13], [16, 30], [33, 23]]]
 
+batch_size: 4
 save_annotated_frames: True
 display: False
 object_size_threshold: 100 #in pixel area.

@@ -2,8 +2,9 @@ import torch
 from torch import nn
 import torch.nn.functional as F
 from tool.torch_utils import *
+from tool.torch_utils import Yolov4Classifier
 from tool.yolo_layer import YoloLayer
-from model.model import Mish, Upsample, Conv_Bn_Activation, ResBlock, DownSample1, DownSample2, DownSample3, \
+from classifier.model import Mish, Upsample, Conv_Bn_Activation, ResBlock, DownSample1, DownSample2, DownSample3, \
     Neck, Yolov4Head, Yolov4
 from argparse import ArgumentParser
 
@@ -45,14 +46,7 @@ def main(args):
 
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
     print("device: ", device)
-
-
-    # Inference input size is 416*416 does not mean training size is the same
-    # Training size could be 608*608 or even other sizes
-    # Optional inference sizes:
-    #   Hight in {320, 416, 512, 608, ... 320 + 96 * n}
-    #   Width in {320, 416, 512, 608, ... 320 + 96 * m}
-
+    frame_count = 0
     video = VideoFileClip(input_video)  # .subclip(50, 60)
     clip = video.fl_image(pipeline)
     clip.write_videofile(output_video, fps=args.fps)
@@ -69,29 +63,37 @@ def pipeline(original_image):
 
     confidence_threshold = parameter_config.model_config.confidence_threshold
     nms_threshold = parameter_config.model_config.nms_threshold
-    batch_size = 1
+    batch_size = parameter_config.batch_size
+    device = parameter_config.model_config.device
 
-    namesfile = 'data/coco.names'
+    class_map = parameter_config.class_map
+    class_names = 'config/coco_classes'
+    class_names = load_class_names(class_names)
+    print('confidence_threshold, nms_threshold, device', confidence_threshold, nms_threshold, device)
+    yolov4 = Yolov4Classifier(confidence_threshold, nms_threshold, device, height, width)
 
     if frame_count == 0 or frame_count % batch_size != 0:
         processed_images.append(resized_image)
         original_sizes.append([original_image.shape[0], original_image.shape[1]])
         original_images.append(original_image)
     elif frame_count > 0 and frame_count % batch_size == 0:
+        boxes = yolov4.predict_batch(model, processed_images, confidence_threshold, nms_threshold, use_cuda)
+        for idx, box in enumerate(boxes):
+            savename = '/Users/ravikannan/Desktop/yolov4/'+str(frame_count-batch_size+idx)+'.jpg'
+            img = plot_boxes_cv2(original_images[idx], box, savename, class_names)
+        processed_images.clear()
+        original_sizes.clear()
+        original_images.clear()
+    frame_count += 1
 
-        boxes = do_detect(model, resized_image, confidence_threshold, nms_threshold, use_cuda)
-
-    class_names = load_class_names(namesfile)
-    img = plot_boxes_cv2(original_image, boxes[0], False, class_names)
-
-    return img
+    return original_image
 
 
 if __name__ == '__main__':
     parser = ArgumentParser()
     parser.add_argument('-i', '--input_video', help="input video path")
     parser.add_argument('-o', '--output_video', help="output video path", default="output.mp4")
-    parser.add_argument('--fps', help="fps", default=1)
+    parser.add_argument('--fps', help="fps", default=5)
     parser.add_argument('--configuration_file_path', help="path to parameter config file")
     args = parser.parse_args()
     main(args)
