@@ -91,13 +91,11 @@ def pipeline(original_image):
     resized_image = cv2.cvtColor(resized_image, cv2.COLOR_BGR2RGB)
     batch_size = parameter_config.batch_size
 
-
-    class_names = 'config/coco_classes'
-    class_names = load_class_names(class_names)
     processed_images.append(resized_image)
     original_sizes.append([original_image.shape[0], original_image.shape[1]])
     original_images.append(original_image)
-    if frame_count > 0 and frame_count % batch_size == batch_size-1:
+
+    if batch_size == 1 or (frame_count > 0 and frame_count % batch_size == 0):
         boxes = yolov4.predict_batch(model, processed_images)
         for idx, box in enumerate(boxes):
             savename = args.output_dir + '/' + str(frame_count - batch_size + idx) + '.jpg'
@@ -105,9 +103,10 @@ def pipeline(original_image):
         processed_images.clear()
         original_sizes.clear()
         original_images.clear()
+
     frame_count += 1
 
-    return original_image
+    return img
 
 
 if __name__ == '__main__':

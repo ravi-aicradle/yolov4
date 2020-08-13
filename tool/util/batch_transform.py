@@ -16,11 +16,12 @@ class Transform:
     @torch.no_grad()
     def preprocess(self, unprocessed_batch_input):
         unprocessed_batch_input = np.array(unprocessed_batch_input)
+        LOGGER.debug("Processing Image Batch of shape : {}".format(unprocessed_batch_input.shape))
         processed_batch = [
             cv2.resize(cv2.cvtColor(x, cv2.COLOR_BGR2RGB), (self.height, self.width), interpolation=cv2.INTER_LINEAR) / 255
             for x in
             unprocessed_batch_input]
         processed_batch_transpose = np.array([np.transpose(x, (2, 0, 1)).astype(np.float32) for x in processed_batch])
         processed_batch = torch.from_numpy(processed_batch_transpose)
-        processed_batch = processed_batch.squeeze(0)
+        # processed_batch = processed_batch.squeeze(0)
         return processed_batch
