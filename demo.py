@@ -16,9 +16,20 @@ import sys
 import cv2
 from moviepy.editor import VideoFileClip
 
+logging.basicConfig(level=os.getenv("LOG_LEVEL", logging.DEBUG))
+LOGGER = logging.getLogger(__name__)
+
 processed_images = list()
 original_sizes = list()
 original_images = list()
+
+
+def create_directory(dir_path):
+    if not os.path.isdir(dir_path):
+        os.makedirs(dir_path)
+        return True
+    else:
+        return False
 
 
 def main(args):
@@ -27,10 +38,11 @@ def main(args):
     global use_cuda
     global parameter_config
     global yolov4
+    global class_map
 
     parameter_config = DotStyleConfiguration(args.configuration_file_path)
 
-    weightfile = parameter_config.model_config.classifier_path
+    weightfile = args.weights_file_path
 
     n_classes = parameter_config.model_config.num_classes
     input_video = args.input_video
@@ -41,16 +53,28 @@ def main(args):
     pretrained_dict = torch.load(weightfile, map_location=torch.device('cpu'))
     model.load_state_dict(pretrained_dict)
 
-    use_cuda = False
-    if use_cuda:
+    if torch.cuda.is_available():
+        use_cuda = True
         model.cuda()
+        device = torch.device(parameter_config.device)
+    else:
+        use_cuda = False
+        device = "cpu"
 
-    device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
-    print("device: ", device)
+    create_directory(args.output_dir)
+
+    LOGGER.debug("device: ", device)
     frame_count = 0
     confidence_threshold = parameter_config.model_config.confidence_threshold
     nms_threshold = parameter_config.model_config.nms_threshold
     height, width = (parameter_config.model_config.image_height, parameter_config.model_config.image_width)
+
+    class_map = parameter_config.class_map
+    original_class_map = {int(key): value for key, value in class_map.items()}
+    class_map = {
+        key: value for key, value in original_class_map.items()
+    }
+    print(class_map)
 
     post_processing = PostProcessing(confidence_threshold, nms_threshold)
     transform = Transform(height, width)
@@ -67,29 +91,23 @@ def pipeline(original_image):
     global use_cuda
     global parameter_config
     global yolov4
+    global class_map
     height, width = (parameter_config.model_config.image_height, parameter_config.model_config.image_width)
     resized_image = cv2.resize(original_image, (width, height))
     resized_image = cv2.cvtColor(resized_image, cv2.COLOR_BGR2RGB)
-
-    confidence_threshold = parameter_config.model_config.confidence_threshold
-    nms_threshold = parameter_config.model_config.nms_threshold
     batch_size = parameter_config.batch_size
-    device = parameter_config.model_config.device
 
-    class_map = parameter_config.class_map
+
     class_names = 'config/coco_classes'
     class_names = load_class_names(class_names)
-    # print('confidence_threshold, nms_threshold, device', confidence_threshold, nms_threshold, device)
-
-    # if frame_count == 0 or frame_count % batch_size != 0:
     processed_images.append(resized_image)
     original_sizes.append([original_image.shape[0], original_image.shape[1]])
     original_images.append(original_image)
     if frame_count > 0 and frame_count % batch_size == 0:
         boxes = yolov4.predict_batch(model, processed_images)
         for idx, box in enumerate(boxes):
-            savename = '/Users/ravikannan/Desktop/yolov4/'+str(frame_count-batch_size+idx)+'.jpg'
-            img = plot_boxes_cv2(original_images[idx], box, savename, class_names)
+            savename = args.output_dir + '/' + str(frame_count - batch_size + idx) + '.jpg'
+            img = plot_boxes_cv2(original_images[idx], box, savename, class_map)
         processed_images.clear()
         original_sizes.clear()
         original_images.clear()
@@ -102,7 +120,9 @@ if __name__ == '__main__':
     parser = ArgumentParser()
     parser.add_argument('-i', '--input_video', help="input video path")
     parser.add_argument('-o', '--output_video', help="output video path", default="output.mp4")
+    parser.add_argument('--output_dir', help="output dir to save images", required=True)
     parser.add_argument('--fps', help="fps", default=5)
     parser.add_argument('--configuration_file_path', help="path to parameter config file")
+    parser.add_argument('-w', '--weights_file_path', help="path to model weights file, yolov4.pth")
     args = parser.parse_args()
     main(args)

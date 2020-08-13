@@ -136,15 +136,8 @@ class Yolov4Classifier:
 
     def predict_batch(self, model, batch_input):
         model.eval()
-        t0 = time.time()
         transformed_batch_input = self.transform.preprocess(batch_input)
         transformed_batch_input = transformed_batch_input.to(self.device)
-        t1 = time.time()
-        output = model(transformed_batch_input)
-        t2 = time.time()
-        """print('-----------------------------------')
-        print('           Preprocess : %f' % (t1 - t0))
-        print('      Model Inference : %f' % (t2 - t1))
-        print('-----------------------------------')"""
-        boxes_out = utils.post_processing(None, self.conf_thresh, self.nms_thresh, output)
+        prediction = model(transformed_batch_input)
+        boxes_out = self.post_processing.post_processing(prediction)
         return boxes_out
