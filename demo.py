@@ -2,13 +2,13 @@ import torch
 from torch import nn
 import torch.nn.functional as F
 from tool.torch_utils import *
-from tool.torch_utils import Yolov4Classifier
+from tool.torch_utils import Yolov4Classifier, Transform
 from tool.yolo_layer import YoloLayer
 from classifier.model import Mish, Upsample, Conv_Bn_Activation, ResBlock, DownSample1, DownSample2, DownSample3, \
     Neck, Yolov4Head, Yolov4
 from argparse import ArgumentParser
 
-from tool.utils import load_class_names, plot_boxes_cv2
+from tool.utils import load_class_names, plot_boxes_cv2, PostProcessing
 from tool.torch_utils import do_detect
 from config.dot_style_configuration import DotStyleConfiguration
 
@@ -26,6 +26,7 @@ def main(args):
     global model
     global use_cuda
     global parameter_config
+    global yolov4
 
     parameter_config = DotStyleConfiguration(args.configuration_file_path)
 
@@ -47,6 +48,14 @@ def main(args):
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
     print("device: ", device)
     frame_count = 0
+    confidence_threshold = parameter_config.model_config.confidence_threshold
+    nms_threshold = parameter_config.model_config.nms_threshold
+    height, width = (parameter_config.model_config.image_height, parameter_config.model_config.image_width)
+
+    post_processing = PostProcessing(confidence_threshold, nms_threshold)
+    transform = Transform(height, width)
+    yolov4 = Yolov4Classifier(post_processing, transform, confidence_threshold, nms_threshold, device, height, width)
+
     video = VideoFileClip(input_video)  # .subclip(50, 60)
     clip = video.fl_image(pipeline)
     clip.write_videofile(output_video, fps=args.fps)
@@ -57,6 +66,7 @@ def pipeline(original_image):
     global model
     global use_cuda
     global parameter_config
+    global yolov4
     height, width = (parameter_config.model_config.image_height, parameter_config.model_config.image_width)
     resized_image = cv2.resize(original_image, (width, height))
     resized_image = cv2.cvtColor(resized_image, cv2.COLOR_BGR2RGB)
@@ -69,15 +79,14 @@ def pipeline(original_image):
     class_map = parameter_config.class_map
     class_names = 'config/coco_classes'
     class_names = load_class_names(class_names)
-    print('confidence_threshold, nms_threshold, device', confidence_threshold, nms_threshold, device)
-    yolov4 = Yolov4Classifier(confidence_threshold, nms_threshold, device, height, width)
+    # print('confidence_threshold, nms_threshold, device', confidence_threshold, nms_threshold, device)
 
-    if frame_count == 0 or frame_count % batch_size != 0:
-        processed_images.append(resized_image)
-        original_sizes.append([original_image.shape[0], original_image.shape[1]])
-        original_images.append(original_image)
-    elif frame_count > 0 and frame_count % batch_size == 0:
-        boxes = yolov4.predict_batch(model, processed_images, confidence_threshold, nms_threshold, use_cuda)
+    # if frame_count == 0 or frame_count % batch_size != 0:
+    processed_images.append(resized_image)
+    original_sizes.append([original_image.shape[0], original_image.shape[1]])
+    original_images.append(original_image)
+    if frame_count > 0 and frame_count % batch_size == 0:
+        boxes = yolov4.predict_batch(model, processed_images)
         for idx, box in enumerate(boxes):
             savename = '/Users/ravikannan/Desktop/yolov4/'+str(frame_count-batch_size+idx)+'.jpg'
             img = plot_boxes_cv2(original_images[idx], box, savename, class_names)

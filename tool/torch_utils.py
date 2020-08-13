@@ -13,6 +13,7 @@ import struct  # get_image_size
 import imghdr  # get_image_size
 
 from tool import utils
+from tool.utils import PostProcessing
 
 logging.basicConfig(level=os.getenv("LOG_LEVEL", logging.DEBUG))
 LOGGER = logging.getLogger(__name__)
@@ -107,13 +108,15 @@ def do_detect(model, img, conf_thresh, nms_thresh, use_cuda=1):
 
 
 class Transform:
+    def __init__(self, height, width):
+        self.height = height
+        self.width = width
 
-    @staticmethod
-    def preprocess(unprocessed_batch_input):
+    def preprocess(self, unprocessed_batch_input):
         unprocessed_batch_input = np.array(unprocessed_batch_input)
         LOGGER.debug("Processing Image Batch of shape : {}".format(unprocessed_batch_input.shape))
         processed_batch = [
-            cv2.resize(cv2.cvtColor(x, cv2.COLOR_BGR2RGB), (416, 416), interpolation=cv2.INTER_LINEAR) / 255
+            cv2.resize(cv2.cvtColor(x, cv2.COLOR_BGR2RGB), (self.height, self.width), interpolation=cv2.INTER_LINEAR) / 255
             for x in
             unprocessed_batch_input]
         processed_batch_transpose = np.array([np.transpose(x, (2, 0, 1)).astype(np.float32) for x in processed_batch])
@@ -122,24 +125,26 @@ class Transform:
 
 
 class Yolov4Classifier:
-    def __init__(self, conf_thresh, nms_thresh, device, height, width):
-        self.conf_thresh = conf_thresh
-        self.nms_thresh = nms_thresh
+    def __init__(self, post_processing, transform, confidence_threshold, nms_threshold, device, height, width):
+        self.conf_thresh = confidence_threshold
+        self.nms_thresh = nms_threshold
         self.device = device
         self.height = height
         self.width = width
+        self.post_processing = post_processing
+        self.transform = transform
 
-    def predict_batch(self, model, batch_input, conf_thresh, nms_thresh, use_cuda=1):
+    def predict_batch(self, model, batch_input):
         model.eval()
         t0 = time.time()
-        transformed_batch_input = Transform.preprocess(batch_input)
+        transformed_batch_input = self.transform.preprocess(batch_input)
         transformed_batch_input = transformed_batch_input.to(self.device)
         t1 = time.time()
         output = model(transformed_batch_input)
         t2 = time.time()
-        print('-----------------------------------')
+        """print('-----------------------------------')
         print('           Preprocess : %f' % (t1 - t0))
         print('      Model Inference : %f' % (t2 - t1))
-        print('-----------------------------------')
+        print('-----------------------------------')"""
         boxes_out = utils.post_processing(None, self.conf_thresh, self.nms_thresh, output)
         return boxes_out
