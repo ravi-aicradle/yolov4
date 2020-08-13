@@ -7,7 +7,7 @@ from classifier.model import Mish, Upsample, Conv_Bn_Activation, ResBlock, DownS
     Neck, Yolov4Head, Yolov4
 from argparse import ArgumentParser
 
-from tool.utils import load_class_names, plot_boxes_cv2
+from tool.util import load_class_names, plot_boxes_cv2
 from tool.torch_utils import do_detect
 from config.dot_style_configuration import DotStyleConfiguration
 

@@ -20,7 +20,7 @@ model_config:
   transform_device: cpu
   anchors: [[[116, 90], [156, 198], [373, 326]], [[30, 61], [62, 45], [59, 119]], [[10, 13], [16, 30], [33, 23]]]
 
-batch_size: 1
+batch_size: 2
 save_annotated_frames: True
 display: False
 object_size_threshold: 100 #in pixel area.

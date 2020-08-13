@@ -1,19 +1,7 @@
-import sys
 import os
-import cv2
-import time
-import math
-import torch
 import numpy as np
+import torch
 import logging
-from torch.autograd import Variable
-
-import itertools
-import struct  # get_image_size
-import imghdr  # get_image_size
-
-from tool import utils
-from tool.utils import PostProcessing
 
 logging.basicConfig(level=os.getenv("LOG_LEVEL", logging.DEBUG))
 LOGGER = logging.getLogger(__name__)
@@ -75,53 +63,6 @@ def convert2cpu(gpu_matrix):
 
 def convert2cpu_long(gpu_matrix):
     return torch.LongTensor(gpu_matrix.size()).copy_(gpu_matrix)
-
-
-def do_detect(model, img, conf_thresh, nms_thresh, use_cuda=1):
-    model.eval()
-    t0 = time.time()
-
-    if type(img) == np.ndarray and len(img.shape) == 3:  # cv2 image
-        img = torch.from_numpy(img.transpose(2, 0, 1)).float().div(255.0).unsqueeze(0)
-    elif type(img) == np.ndarray and len(img.shape) == 4:
-        img = torch.from_numpy(img.transpose(0, 3, 1, 2)).float().div(255.0)
-    else:
-        print("unknow image type")
-        exit(-1)
-
-    if use_cuda:
-        img = img.cuda()
-    img = torch.autograd.Variable(img)
-
-    t1 = time.time()
-
-    output = model(img)
-
-    t2 = time.time()
-
-    print('-----------------------------------')
-    print('           Preprocess : %f' % (t1 - t0))
-    print('      Model Inference : %f' % (t2 - t1))
-    print('-----------------------------------')
-
-    return utils.post_processing(img, conf_thresh, nms_thresh, output)
-
-
-class Transform:
-    def __init__(self, height, width):
-        self.height = height
-        self.width = width
-
-    def preprocess(self, unprocessed_batch_input):
-        unprocessed_batch_input = np.array(unprocessed_batch_input)
-        LOGGER.debug("Processing Image Batch of shape : {}".format(unprocessed_batch_input.shape))
-        processed_batch = [
-            cv2.resize(cv2.cvtColor(x, cv2.COLOR_BGR2RGB), (self.height, self.width), interpolation=cv2.INTER_LINEAR) / 255
-            for x in
-            unprocessed_batch_input]
-        processed_batch_transpose = np.array([np.transpose(x, (2, 0, 1)).astype(np.float32) for x in processed_batch])
-        processed_batch = torch.from_numpy(processed_batch_transpose)
-        return processed_batch
 
 
 class Yolov4Classifier:

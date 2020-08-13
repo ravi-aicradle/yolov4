@@ -1,18 +1,12 @@
-import torch
-from torch import nn
-import torch.nn.functional as F
 from tool.torch_utils import *
-from tool.torch_utils import Yolov4Classifier, Transform
-from tool.yolo_layer import YoloLayer
-from classifier.model import Mish, Upsample, Conv_Bn_Activation, ResBlock, DownSample1, DownSample2, DownSample3, \
-    Neck, Yolov4Head, Yolov4
+from tool.torch_utils import Yolov4Classifier
+from classifier.model import Yolov4
 from argparse import ArgumentParser
 
-from tool.utils import load_class_names, plot_boxes_cv2, PostProcessing
-from tool.torch_utils import do_detect
+from tool.utils import load_class_names, plot_boxes_cv2
 from config.dot_style_configuration import DotStyleConfiguration
-
-import sys
+from tool.util.nms import PostProcessing
+from tool.util.batch_transform import Transform
 import cv2
 from moviepy.editor import VideoFileClip
 
@@ -103,7 +97,7 @@ def pipeline(original_image):
     processed_images.append(resized_image)
     original_sizes.append([original_image.shape[0], original_image.shape[1]])
     original_images.append(original_image)
-    if frame_count > 0 and frame_count % batch_size == 0:
+    if frame_count > 0 and frame_count % batch_size == batch_size-1:
         boxes = yolov4.predict_batch(model, processed_images)
         for idx, box in enumerate(boxes):
             savename = args.output_dir + '/' + str(frame_count - batch_size + idx) + '.jpg'
