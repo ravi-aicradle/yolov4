@@ -14,10 +14,6 @@ from moviepy.editor import VideoFileClip
 logging.basicConfig(level=os.getenv("LOG_LEVEL", logging.DEBUG))
 LOGGER = logging.getLogger(__name__)
 
-processed_images = list()
-original_sizes = list()
-original_images = list()
-
 
 def create_directory(dir_path):
     if not os.path.isdir(dir_path):
@@ -65,47 +61,51 @@ def main(args):
 
     height, width = (parameter_config.model_config.image_height, parameter_config.model_config.image_width)
 
-    classification_worker = ObjectClassificationWorker(batch_size, model, input_directory)
+    classification_worker = ObjectClassificationWorker(batch_size=batch_size,
+                                                       classifier=yolov4,
+                                                       model=model,
+                                                       input_directory=input_directory,
+                                                       width=width,
+                                                       height=height,
+                                                       class_map=class_map)
     classification_worker.worker()
 
 
-
 class ObjectClassificationWorker:
-    def __init__(self, batch_size, model, input_directory, width, height):
+    def __init__(self, batch_size, classifier, model, input_directory, width, height, class_map):
         self.batch_size = batch_size
         self.model = model
         self.input_directory = input_directory
         self.width = width
         self.height = height
+        self.classifier = classifier
+        self.class_map = class_map
 
-    def preprocess(self, original_image_batch):
-        for original_image in original_image_batch:
+    def preprocess(self, original_image_path_list):
+        processed_image_batch = list()
+        original_sizes = list()
+        original_image_batch = list()
+        for original_image_path in original_image_path_list:
+            original_image = cv2.imread(original_image_path)
+            original_image_batch.append(original_image)
             resized_image = cv2.resize(original_image, (self.width, self.height))
             resized_image = cv2.cvtColor(resized_image, cv2.COLOR_BGR2RGB)
-
+            processed_image_batch.append(resized_image)
+            original_sizes.append([original_image.shape[0], original_image.shape[1]])
+        return original_sizes, original_image_batch, processed_image_batch
 
     def worker(self):
-        original_image_batch = get_image_batches(self.input_directory, self.batch_size)
-        processed_images = self.preprocess(original_image_batch)
-
-        processed_images.append(resized_image)
-        original_sizes.append([original_image.shape[0], original_image.shape[1]])
-        original_images.append(original_image)
-        img = original_image
-
-        if batch_size == 1 or (frame_count > 0 and frame_count % self.batch_size == 0):
-            boxes = yolov4.predict_batch(model, processed_images)
+        original_image_batch_list = get_image_batches(self.input_directory, self.batch_size)
+        for original_image_batch in original_image_batch_list:
+            preprocessed_output = self.preprocess(original_image_batch)
+            original_sizes, original_image_batch, processed_image_batch = zip(*preprocessed_output)
+            boxes = self.classifier.predict_batch(self.model, processed_image_batch)
             for idx, box in enumerate(boxes):
-                savename = args.output_dir + '/' + str(frame_count - batch_size + idx) + '.jpg'
-                img = plot_boxes_cv2(original_images[idx], box, savename, class_map)
-            processed_images.clear()
-            original_sizes.clear()
-            original_images.clear()
+                output_filename = processed_image_batch[idx].split('/')[-1]
+                savename = args.output_dir + '/' + output_filename
+                img = plot_boxes_cv2(original_image_batch[idx], box, savename, self.class_map)
 
         return
-
-
-
 
 
 if __name__ == '__main__':
