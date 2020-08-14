@@ -19,44 +19,6 @@ def softmax(x):
     return x
 
 
-def bbox_iou(box1, box2, x1y1x2y2=True):
-    # print('iou box1:', box1)
-    # print('iou box2:', box2)
-
-    if x1y1x2y2:
-        mx = min(box1[0], box2[0])
-        Mx = max(box1[2], box2[2])
-        my = min(box1[1], box2[1])
-        My = max(box1[3], box2[3])
-        w1 = box1[2] - box1[0]
-        h1 = box1[3] - box1[1]
-        w2 = box2[2] - box2[0]
-        h2 = box2[3] - box2[1]
-    else:
-        w1 = box1[2]
-        h1 = box1[3]
-        w2 = box2[2]
-        h2 = box2[3]
-
-        mx = min(box1[0], box2[0])
-        Mx = max(box1[0] + w1, box2[0] + w2)
-        my = min(box1[1], box2[1])
-        My = max(box1[1] + h1, box2[1] + h2)
-    uw = Mx - mx
-    uh = My - my
-    cw = w1 + w2 - uw
-    ch = h1 + h2 - uh
-    carea = 0
-    if cw <= 0 or ch <= 0:
-        return 0.0
-
-    area1 = w1 * h1
-    area2 = w2 * h2
-    carea = cw * ch
-    uarea = area1 + area2 - carea
-    return carea / uarea
-
-
 
 def get_color(c, x, max_val):
     colors = np.array([[1, 0, 1], [0, 0, 1], [0, 1, 1], [0, 1, 0], [1, 1, 0], [1, 0, 0]], dtype=np.float32)
@@ -104,17 +66,6 @@ def plot_boxes_cv2(img, boxes, savename=None, class_map=None, color=None):
         print("save plot results to %s" % savename)
         cv2.imwrite(savename, img)
     return img
-
-
-def read_truths(lab_path):
-    if not os.path.exists(lab_path):
-        return np.array([])
-    if os.path.getsize(lab_path):
-        truths = np.loadtxt(lab_path)
-        truths = truths.reshape(truths.size / 5, 5)  # to avoid single truth problem
-        return truths
-    else:
-        return np.array([])
 
 
 def load_class_names(namesfile):
