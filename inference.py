@@ -92,19 +92,19 @@ class ObjectClassificationWorker:
             resized_image = cv2.cvtColor(resized_image, cv2.COLOR_BGR2RGB)
             processed_image_batch.append(resized_image)
             original_sizes.append([original_image.shape[0], original_image.shape[1]])
-        return original_sizes, original_image_batch, processed_image_batch
+        preprocessed_output = (original_sizes, original_image_batch, processed_image_batch)
+        return preprocessed_output
 
     def worker(self):
-        original_image_batch_list = get_image_batches(self.input_directory, self.batch_size)
-        for original_image_batch in original_image_batch_list:
-            preprocessed_output = self.preprocess(original_image_batch)
-            original_sizes, original_image_batch, processed_image_batch = zip(*preprocessed_output)
+        original_image_path_batch_list = get_image_batches(self.input_directory, self.batch_size)
+        for original_image_path_batch in original_image_path_batch_list:
+            preprocessed_output = self.preprocess(original_image_path_batch)
+            original_sizes, original_image_batch, processed_image_batch = preprocessed_output
             boxes = self.classifier.predict_batch(self.model, processed_image_batch)
             for idx, box in enumerate(boxes):
-                output_filename = processed_image_batch[idx].split('/')[-1]
+                output_filename = original_image_path_batch[idx].split('/')[-1]
                 savename = args.output_dir + '/' + output_filename
                 img = plot_boxes_cv2(original_image_batch[idx], box, savename, self.class_map)
-
         return
 
 
