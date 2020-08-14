@@ -50,7 +50,7 @@ def main(args):
     if torch.cuda.is_available():
         use_cuda = True
         model.cuda()
-        device = torch.device(parameter_config.device)
+        device = torch.device(parameter_config.model_config.device)
     else:
         use_cuda = False
         device = "cpu"
@@ -94,6 +94,7 @@ def pipeline(original_image):
     processed_images.append(resized_image)
     original_sizes.append([original_image.shape[0], original_image.shape[1]])
     original_images.append(original_image)
+    img = original_image
 
     if batch_size == 1 or (frame_count > 0 and frame_count % batch_size == 0):
         boxes = yolov4.predict_batch(model, processed_images)
