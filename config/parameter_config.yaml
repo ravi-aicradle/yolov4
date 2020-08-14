@@ -1,0 +1,47 @@
+name: object_detector
+service_name: intel_video_object_classifier
+class_map: # dictionary of classes we only care about (CART classes)
+  "0": person
+  "1": bicycle
+  "2": car
+  "3": motorcycle
+  "5": bus
+  "7": truck
+model_config:
+  num_classes: 80
+  confidence_threshold: .30
+  nms_threshold: .50 # threshold for selecting a bounding box when multiple bounding boxes competing for same object
+  device: cpu # set to cuda:0 to process on GPU. set to "cpu" if working on non-GPU machine
+  image_height: 416
+  image_width: 416
+  backbone_name: darknet53
+  backbone_pretrained: $LOCAL_PATH/model_weights/darknet53_weights_pytorch.pth
+  classifier_path: '/Users/ravikannan/Desktop/workspace/cv/tian/pytorch-YOLOv4/weights/yolov4.pth'
+  transform_device: cpu
+  anchors: [12, 16, 19, 36, 40, 28, 36, 75, 76, 55, 72, 146, 142, 110, 192, 243, 459, 401]
+
+batch_size: 2
+save_annotated_frames: True
+display: False
+object_size_threshold: 100 #in pixel area.
+resize_large_frames: False # If image height > 1000 and widht > 1000 we resize the frame to 640 x 360 for faster processing
+normalize_coordinates: True # if the csv file should output normalized bounding boxed coordinates
+normalize_coordinates_mot: False
+mot_format: True # <frame>, <id>, <bb_left>, <bb_top>, <bb_width>, <bb_height>, <conf>, <x>, <y>, <z>
+
+annotation_config:
+  centroid_labelling:
+    radius: 5
+    circle_color: [0, 0, 255]
+    circle_thickness: -1
+    label_fontScale: 0.6
+    label_thickness: 1
+    label_color: [0, 0, 255]
+
+  detection_labelling:
+    enable: false
+    box_color: [0, 0, 0]
+    box_thickness: 1
+    label_fontScale: 0.5
+    label_thickness: 1
+    label_color: [0, 0, 255]
